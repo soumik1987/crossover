@@ -10,9 +10,11 @@ const memcachedClient = new memcached(`${process.env.ENDPOINT}:${process.env.POR
 exports.chargeRequestRedis = async function (input) {
     const redisClient = await getRedisClient();
     var charges = getCharges();
+    // Not using get_balace. directly charging account.
     var remainingBalance = await chargeRedis(redisClient, KEY, charges);
     const isAuthorized = authorizeRequest(remainingBalance);
     if (!isAuthorized) {
+        // if account balance is negative adding charges back.
         remainingBalance = await chargeRedis(redisClient, KEY, -charges);
         return {
             remainingBalance,
@@ -76,15 +78,12 @@ async function disconnectRedis(client) {
         });
     });
 }
+// modified authorizeRequest
 function authorizeRequest(remainingBalance) {
     return remainingBalance >= 0;
 }
 function getCharges() {
     return DEFAULT_BALANCE / 20;
-}
-async function getBalanceRedis(redisClient, key) {
-    const res = await util.promisify(redisClient.get).bind(redisClient).call(redisClient, key);
-    return parseInt(res || "0");
 }
 async function chargeRedis(redisClient, key, charges) {
     return util.promisify(redisClient.decrby).bind(redisClient).call(redisClient, key, charges);
